@@ -1,0 +1,6 @@
+.env
+env-files/*.env
+#config-files/**/*.conf
+/nextcloud
+/nginx-proxy
+/docker-files

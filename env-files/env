@@ -1,0 +1,62 @@
+##########################################################################
+# Este é o arquivo env para configurar sua configuração comum.
+# Verifique ./env-files/*.env para arquivos env específicos do aplicativo.
+##########################################################################
+
+# Prefixo de instância nextcloud. Isso será prefixado para todos os contêineres em execução.
+# Padrão: cloud
+PREFIX_INSTANCE=cloud
+
+# O endereço IP da interface de acesso externo
+IP=localhost
+
+# As credenciais do Docker Hub Container Image Library
+#DOCKER_HUB_USER=user
+#DOCKER_HUB_PASS=1234567890
+
+# Opção para personalizar a rede proxy, use a seguinte variável
+#PROXY_NETWORK_OPTIONS="--opt criptografado=true"
+
+# Para personalizar a rede nextcloud, use a seguinte variável
+#NEXTCLOUD_NETWORK_OPTIONS="--opt criptografado=true"
+
+# Caminhos de arquivo NGINX-PROXY e NEXTCLOUD que serão montados em contêineres.
+# É possível configurar os caminhos onde o nginx e o nextcloud armazenam todos os seus
+# dados, banco de dados, configuração e certificados. Com os valores padrão abaixo,
+# novas subpastas serão criadas em seu caminho atual.
+PATH_NGINX_PROXY=./nginx-proxy
+PATH_NEXTCLOUD=./nextcloud
+
+# NGINX usa arquivos conf especiais
+# Caso seja necessário adicionar alguma configuração especial ao seu NGINX Web Proxy,
+# você edita/adiciona arquivos na pasta ./config-files/nginx-proxy-conf.d/.
+# Por favor, verifique 'uploadsize.conf.sample' como exemplo.
+# Por favor, não esqueça de renomear o arquivo para '[FILENAME].conf'
+# [AVISO 1] Esta configuração foi criada para usar `fresh-start.sh`.
+# [AVISO 2] Assim que você definir esta opção como true todos os arquivos '.conf' serão copiados para data
+# pasta (/conf.d). Se você decidir remover esta configuração especial
+# você deve excluir seus arquivos da pasta de dados ./data/conf.d.
+#USE_NGINX_CONF_FILES=true
+
+# Configuração do Docker Logging
+# Esta seção oferece duas opções max-size e max-file, que seguem a documentação do docker como se segue:
+# logging:
+#      driver: "json-file"
+#      options:
+#        max-size: "200k"
+#        max-file: "10"
+NGINX_PROXY_LOG_DRIVER=json-file
+NGINX_PROXY_LOG_MAX_SIZE=4m
+NGINX_PROXY_LOG_MAX_FILE=10
+
+DOCKER_GEN_LOG_DRIVER=json-file
+DOCKER_GEN_LOG_MAX_SIZE=2m
+DOCKER_GEN_LOG_MAX_FILE=10
+
+ACME_COMPANION_LOG_DRIVER=json-file
+ACME_COMPANION_LOG_MAX_SIZE=2m
+ACME_COMPANION_LOG_MAX_FILE=10
+
+# Define a política SSL (o padrão é Mozilla-Intermediate).
+# Veja as opções disponíveis aqui: https://github.com/nginx-proxy/nginx-proxy#how-ssl-support-works
+SSL_POLICY=Mozilla-Modern

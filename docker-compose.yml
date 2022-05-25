@@ -1,0 +1,144 @@
+# https://github.com/edemirkan/rpi-nextcloud
+################################################################
+# * Sobe os containeres
+# docker-compose up --remove-orphans --force-recreate --build -d
+################################################################
+# * Verifica logs do container
+# sudo docker-compose logs -f
+################################################################
+# * Remove todos containers
+# docker rm -f $(docker ps -qa)
+# * Remove todas as imagens locais
+# docker rmi $(docker images -qa) -f
+# * Remove volumes órfãos
+# docker volume rm $(docker volume ls -qf dangling=true)
+################################################################
+
+version: '3.9'
+
+services:
+  nginx-proxy:
+    image: nginx:stable-alpine
+    labels:
+      com.github.jrcs.letsencrypt_nginx_proxy_companion.nginx_proxy: "true"
+    container_name: ${PREFIX_INSTANCE:-cloud}_nginx_proxy
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ${PATH_NGINX_PROXY:-./nginx-proxy}/conf.d:/etc/nginx/conf.d
+      - ${PATH_NGINX_PROXY:-./nginx-proxy}/vhost.d:/etc/nginx/vhost.d
+      - ${PATH_NGINX_PROXY:-./nginx-proxy}/html:/usr/share/nginx/html
+      - ${PATH_NGINX_PROXY:-./nginx-proxy}/certs:/etc/nginx/certs:ro
+    logging:
+      driver: ${NGINX_PROXY_LOG_DRIVER:-json-file}
+      options:
+        max-size: ${NGINX_PROXY_LOG_MAX_SIZE:-4m}
+        max-file: ${NGINX_PROXY_LOG_MAX_FILE:-10}
+    networks:
+      - proxy-network
+  
+  docker-gen:
+    build:
+      context: ./docker-files/docker-gen
+      dockerfile: $PWD/Dockerfile
+    image: ${PREFIX_INSTANCE:-cloud}-docker-gen
+    labels:
+      com.github.jrcs.letsencrypt_nginx_proxy_companion.docker_gen: "true"
+    command: -notify-sighup ${PREFIX_INSTANCE:-cloud}_nginx_proxy -watch -wait 5s:30s /etc/docker-gen/templates/nginx.tmpl /etc/nginx/conf.d/default.conf
+    container_name: ${PREFIX_INSTANCE:-cloud}_docker_gen
+    restart: always
+    environment:
+      SSL_POLICY: ${SSL_POLICY:-Mozilla-Intermediate}
+    volumes:
+      - ${PATH_NGINX_PROXY:-./nginx-proxy}/conf.d:/etc/nginx/conf.d
+      - ${PATH_NGINX_PROXY:-./nginx-proxy}/vhost.d:/etc/nginx/vhost.d
+      - ${PATH_NGINX_PROXY:-./nginx-proxy}/html:/usr/share/nginx/html
+      - ${PATH_NGINX_PROXY:-./nginx-proxy}/certs:/etc/nginx/certs:ro
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+    logging:
+      driver: ${DOCKER_GEN_LOG_DRIVER:-json-file}
+      options:
+        max-size: ${DOCKER_GEN_LOG_MAX_SIZE:-2m}
+        max-file: ${DOCKER_GEN_LOG_MAX_FILE:-10}
+    networks:
+      - proxy-network
+    
+  acme-companion:
+    build:
+      context: ./docker-files/acme-companion
+      dockerfile: $PWD/Dockerfile
+    image: ${PREFIX_INSTANCE:-cloud}-acme-companion
+    container_name: ${PREFIX_INSTANCE:-cloud}_acme_companion
+    restart: always
+    volumes:
+      - ${PATH_NGINX_PROXY:-./nginx-proxy}/conf.d:/etc/nginx/conf.d
+      - ${PATH_NGINX_PROXY:-./nginx-proxy}/vhost.d:/etc/nginx/vhost.d
+      - ${PATH_NGINX_PROXY:-./nginx-proxy}/html:/usr/share/nginx/html
+      - ${PATH_NGINX_PROXY:-./nginx-proxy}/certs:/etc/nginx/certs:rw
+      - ${PATH_NGINX_PROXY:-./nginx-proxy}/acme:/etc/acme.sh
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      NGINX_DOCKER_GEN_CONTAINER: ${PREFIX_INSTANCE:-cloud}_docker_gen
+      NGINX_PROXY_CONTAINER: ${PREFIX_INSTANCE:-cloud}_nginx_proxy
+    logging:
+      driver: ${ACME_COMPANION_LOG_DRIVER:-json-file}
+      options:
+        max-size: ${ACME_COMPANION_LOG_MAX_SIZE:-2m}
+        max-file: ${ACME_COMPANION_LOG_MAX_FILE:-10}
+    networks:
+      - proxy-network
+    
+  nextcloud-database:
+    image: postgres:13-alpine
+    container_name: ${PREFIX_INSTANCE:-cloud}_database
+    restart: always
+    volumes:
+      - ${PATH_NEXTCLOUD:-./nextcloud}/db:/var/lib/postgresql/data
+    env_file:
+      - ./env-files/nextcloud-database.env
+    networks:
+      - nextcloud-network
+
+  nextcloud-app:
+    image: nextcloud:fpm-alpine
+    container_name: ${PREFIX_INSTANCE:-cloud}_app
+    restart: always
+    volumes: 
+      - ${PATH_NEXTCLOUD:-./nextcloud}/data:/var/www/html
+    env_file:
+      - ./env-files/nextcloud-app.env
+    environment:
+      - POSTGRES_HOST=${PREFIX_INSTANCE:-cloud}_database
+    depends_on:
+      - nextcloud-database
+    networks:
+      - nextcloud-network
+
+  nextcloud-web:
+    image: nginx:alpine
+    container_name: ${PREFIX_INSTANCE:-cloud}_web
+    restart: always
+    expose:
+      - "80"
+    depends_on:
+      - nginx-proxy
+      - docker-gen
+      - acme-companion
+    volumes:
+      - ${PATH_NEXTCLOUD:-./nextcloud}/config/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ${PATH_NEXTCLOUD:-./nextcloud}/data:/var/www/html:ro
+    env_file:
+      - ./env-files/nextcloud-web.env
+    networks:
+      - proxy-network
+      - nextcloud-network
+      
+networks:
+  proxy-network:
+    external: true
+    name: ${PREFIX_INSTANCE:-cloud}-proxy-network
+  nextcloud-network:
+    external: true
+    name: ${PREFIX_INSTANCE:-cloud}-nextcloud-network
