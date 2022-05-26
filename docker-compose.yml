@@ -1,4 +1,4 @@
-# https://github.com/edemirkan/rpi-nextcloud
+
 ################################################################
 # * Sobe os containeres
 # docker-compose up --remove-orphans --force-recreate --build -d
@@ -31,6 +31,7 @@ services:
       - ${PATH_NGINX_PROXY:-./nginx-proxy}/vhost.d:/etc/nginx/vhost.d
       - ${PATH_NGINX_PROXY:-./nginx-proxy}/html:/usr/share/nginx/html
       - ${PATH_NGINX_PROXY:-./nginx-proxy}/certs:/etc/nginx/certs:ro
+      - $PWD/config-files/config.php:/var/www/nextcloud/config/config.php
     logging:
       driver: ${NGINX_PROXY_LOG_DRIVER:-json-file}
       options:
